@@ -1,7 +1,7 @@
 <?php
 
 /*
-Version 2022.09.26.2.46
+Version 2022.09.26.3.01
 
 This is free and unencumbered software released into the public domain.
 
@@ -29,13 +29,15 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <https://unlicense.org>
 */
 
-$stream = "";
+$stream = ""; // The URL of the livestream
 $recording_seconds = 60*60; // 60 * 60 seconds = 1 hour
 
 /*
 The timing is somewhat inaccurate, as it depends on the chunksize and kbps of the stream.
 Please record more time than needed to prevent a too short recording.
 My test recording of 60 Minutes was saved into a ~59:56 Track.
+
+Information: a file named ".lock" is locking the script while recording, to prevent to be opened by multiple users or at multiple times. If an error might occur and the script is locked, you can delete .lock or you wait $recording_seconds to reaccess the script.
 */
 
 ////////// There is no need to change anything below this line of code ////////// 
@@ -75,7 +77,7 @@ set_time_limit($recording_seconds+60); // The execution time for the script is h
 file_put_contents(".lock",time()+$recording_seconds+5);
 
 $filename = $dir.date("Y-m-d_H-i-s",time()).".mp3";
-$fz = fopen($filename, 'wb');
+
 $fp = fopen($stream, 'rb');
 if(!$fp){echo "<p>Error: The stream could not be opened.</p>";exit;}
 
@@ -84,16 +86,15 @@ $kb = 30000; // obsolete at the moment; depends on the individual chunksize of t
 $starttime = time();
 
 Repeat:
-$music[] = fread($fp,$kb);
-$now = time();
+$read = fread($fp,$kb);
+$music[] = $read;
 
+file_put_contents($filename, $read, FILE_APPEND);
+
+$now = time();
 if($now-$starttime < $recording_seconds){GOTO Repeat;}
 
 fclose($fp);
-fclose($fz);
-
-$music = implode("",$music);
-file_put_contents($filename,$music);
 unlink(".lock");
 
 if(!is_file($filename))
