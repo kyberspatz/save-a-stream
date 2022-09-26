@@ -1,7 +1,7 @@
 <?php
 
 /*
-Version 2022.09.26.3.01
+Version 2022.09.26.4.02
 
 This is free and unencumbered software released into the public domain.
 
@@ -31,6 +31,7 @@ For more information, please refer to <https://unlicense.org>
 
 $stream = ""; // The URL of the livestream
 $recording_seconds = 60*60; // 60 * 60 seconds = 1 hour
+$pre = "record_"; // here you can define a prename for the file
 
 /*
 The timing is somewhat inaccurate, as it depends on the chunksize and kbps of the stream.
@@ -46,19 +47,6 @@ Information: a file named ".lock" is locking the script while recording, to prev
 error_reporting(0);
 
 if(empty($stream)){exit('<p>Error: Please define an URL in <b>$stream</b>.</p>');}
-if(is_file(".lock"))
-{
-	$time = file_get_contents(".lock");
-	if(time()<$time)
-	{
-		echo '<p>Please wait, recording in progress. Estimated end of recording: <b>'.date("d.m.Y @ H:i:s",$time).'</b>';
-		exit;
-	} 
-	else 
-	{
-		unlink(".lock");
-	}
-}
 
 file_put_contents("iswritable.txt","1");
 if(!is_file("iswritable.txt"))
@@ -72,14 +60,41 @@ if(!is_file("iswritable.txt"))
 
 $dir = "recordings/";
 if(!is_dir($dir)){mkdir($dir);}
+$filename = $dir.$pre.date("Y-m-d_H-i-s",time()).".mp3";
+
+if(is_file(".lock"))
+{
+	$lockinfo = explode("|",file_get_contents(".lock"));
+	$time = $lockinfo[1];
+	$now = time();
+	$calctime = ($time-$recording_seconds-$now)*-1;
+	if($calctime>5)
+	{
+		if(!is_file($lockinfo[0]))
+		{
+			echo "Error: The file was not created. Is the stream up?";
+			unlink(".lock");
+			exit;
+		}
+	}
+	
+		if($now<$time)
+	{
+		echo '<p>Please wait, recording in progress. Estimated end of recording: <b>'.date("d.m.Y @ H:i:s",$time).'</b>';
+		exit;
+	} 
+	else 
+	{
+		unlink(".lock");
+	}
+}
 
 set_time_limit($recording_seconds+60); // The execution time for the script is hereby adjusted
-file_put_contents(".lock",time()+$recording_seconds+5);
-
-$filename = $dir.date("Y-m-d_H-i-s",time()).".mp3";
 
 $fp = fopen($stream, 'rb');
 if(!$fp){echo "<p>Error: The stream could not be opened.</p>";exit;}
+
+file_put_contents(".lock",$filename."|".time()+$recording_seconds+5);
 
 $kb = 30000; // obsolete at the moment; depends on the individual chunksize of the data
 
